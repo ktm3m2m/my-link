@@ -128,9 +128,35 @@ graph TD
 
 ---
 
-## 4. UI/UX 상세 가이드라인
+---
+
+## 5. 전체 페이지 흐름도 (Page Flow)
+
+사용자가 서비스에서 경험하게 되는 전체적인 흐름입니다.
+
+```mermaid
+flowchart TD
+    Start((시작)) --> Landing[랜딩 페이지]
+    
+    subgraph OwnerFlow [소유자 흐름]
+        Landing -->|구글 로그인| Dashboard[대시보드: 편집 모드]
+        Dashboard -->|데이터 수정| Save[저장 프로세스]
+        Save --> Dashboard
+        Dashboard -->|로그아웃| Landing
+    end
+
+    subgraph VisitorFlow [방문자 흐름]
+        V_Start((URL 접속)) --> PublicPage[공개 프로필 페이지]
+        PublicPage -->|링크 클릭| External[외부 서비스 이동]
+    end
+
+    Dashboard -.->|공유| PublicPage
+```
+
+## 6. UI/UX 상세 가이드라인
 
 1.  **원형 아이콘**: 모든 프로필 이미지와 링크 파비콘은 원형(`border-radius: 50%`)으로 처리하여 부드러운 인상을 줍니다.
 2.  **저장 버튼**: 우측 상단 내비게이션 바에 고정(Sticky) 배치하여 언제든 변경 사항을 저장할 수 있도록 합니다.
 3.  **최상단 추가 버튼**: 리스트의 최상단에 큰 버튼으로 배치하여 새로운 링크 등록을 가장 먼저 유도합니다.
 4.  **인라인 편집**: 텍스트 영역 클릭 시 바로 `input` 혹은 `textarea`로 전환되며, 최종 저장은 상단 '저장' 버튼을 통해 수행합니다.
+
