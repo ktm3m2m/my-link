@@ -122,6 +122,8 @@
     }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(circle at 1px 1px, oklch(var(--border)) 1px, transparent 0);
+    background-size: 24px 24px;
     }
   html {
     @apply font-mono;
