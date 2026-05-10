@@ -1,6 +1,6 @@
 # [PRD] 마이링크 (MyLink) - 심플 링크 통합 서비스
 
-**Version: v1.2**  
+**Version: v1.3**  
 **Last Updated: 2026-05-10**
 
 ## 1. 프로젝트 개요
@@ -12,37 +12,49 @@
 
 ### 2.1 필수 기능
 - **인증 (Firebase Auth)**: 구글 소셜 로그인 단일 인증 방식.
-- **프로필 관리 (Google 기반)**: 
-    - **프로필 이미지**: 사용자의 구글 계정 프로필 이미지를 자동으로 사용하며, 별도의 업로드나 수정 기능은 제공하지 않음.
-    - **닉네임 (Nickname)**: 화면에 표시될 이름이자 본인 페이지의 URL 식별자 (`mylink.com/{nickname}`).
-    - **한 줄 소개 (Bio)**: 본인을 표현하는 짧은 소개 문구.
-- **완전한 인라인 편집 (True Inline Editing)**: 
-    - 별도의 수정 폼, 모달, 페이지 이동 없이 대시보드 상의 텍스트를 클릭하여 즉시 수정 및 저장하는 방식 적용.
+- **프로필 관리 및 초기화**: 
+    - **프로필 이미지 (photoURL)**: 구글 프로필 이미지를 사용하며 수정 기능 없음.
+    - **URL 식별자 (displayName)**: 본인 페이지의 고유 URL 경로 (`mylink.com/{displayName}`). 구글 이메일의 ID 부분으로 자동 초기화됨.
+    - **표시 이름 (username)**: 프로필 상단에 노출되는 이름. 구글 프로필 이름으로 자동 초기화됨.
+    - **한 줄 소개 (bio)**: 본인을 표현하는 짧은 문구.
+- **인라인 편집 (Inline Editing)**: 
+    - 별도의 폼이나 모달 없이 대시보드 내 `username`, `bio` 텍스트를 클릭하여 즉시 수정.
 - **링크 관리**: 
-    - 제목 및 URL 입력을 통한 링크 추가 및 삭제.
-    - **Google Favicon API 활용**: 링크의 아이콘은 Google API를 통해 자동으로 추출 및 표시.
-- **디자인 시스템**: **shadcn/ui** 기반의 깔끔하고 모던한 UI.
-- **반응형 뷰어 (Public Page)**: 모바일에 최적화된 반응형 디자인으로 공개 프로필 페이지 구현.
+    - 제목 및 URL 입력 기능을 통한 링크 추가 및 삭제.
+    - **Google Favicon API 활용**: 링크 파비콘 자동 표시.
+- **디자인 시스템**: **shadcn/ui** 기반의 깔끔한 모바일 최적화 반응형 디자인.
 
 ### 2.2 향후 추가 기능
-- **방문자 통계 및 분석 대시보드**: 페이지 방문자 수, 링크 클릭수 분석 기능.
+- **방문자 통계 및 분석 대시보드**: 페이지 방문자 수 및 링크 클릭수 트래킹.
 
-## 3. 기술적 요구사항 및 데이터 모델링
+## 3. 데이터베이스 모델링 (NoSQL - Firestore)
 
-### 3.1 데이터베이스 (Firebase Firestore)
-- **사용자 정보**: `users` 컬렉션.
-    - 필수 필드: `uid`, `email`, `nickname` (URL 식별자), `bio`, `photoURL` (Google 제공 이미지 URL).
-- **링크 데이터**: **서브 컬렉션(Sub-collection)** 구조.
-    - 경로: `users/{uid}/links/{linkId}`
-    - 필드: `title`, `url`, `faviconUrl`, `createdAt`.
+### 3.1 Users Collection
+```json
+{
+  "uid": "google_uid_123",
+  "email": "user@example.com",
+  "displayName": "caesiumy", // URL Slug (Unique). Init from email prefix.
+  "username": "Caesium Y",   // 프로필 표시 이름 (Real Name). Init from Google Name.
+  "photoURL": "https://lh3.googleusercontent.com/...", // Google 프로필 이미지
+  "bio": "Frontend Developer",
+  "createdAt": "timestamp"
+}
+```
+*Note: `displayName`의 유일성을 보장하기 위해 별도 인덱스나 로직이 필요함.*
 
-### 3.2 UI/UX 가이드라인
-- **모바일 퍼스트**: 뷰어 페이지는 모바일 기기에서의 가독성과 터치 편의성을 최우선으로 함.
-- **심플리시티**: 사용자 조작을 최소화하고 직관적인 인라인 편집 경험 제공.
+### 3.2 Links Sub-collection (users/{uid}/links)
+```json
+{
+  "id": "link_uuid",
+  "title": "My Blog",
+  "url": "https://blog.example.com",
+  "createdAt": "timestamp"
+}
+```
 
 ## 4. 제약 사항 및 제외 범위
-- **이미지 업로드 없음**: 프로필 이미지는 구글 제공 이미지만 사용.
-- **수정 UI 간소화**: 별도의 '저장' 버튼이나 모달 팝업 없이 편집 즉시 반영(또는 포커스 아웃 시 반영) 지향.
-- **정적 리스트**: 링크 순서 변경(D&D) 및 노출 활성화 토글 기능 제외.
-- **테마 미지원**: 단일 고정 디자인 테마 사용.
+- **이미지 업로드 없음**: 구글 프로필 이미지만 사용.
+- **편집 UI**: 별도의 저장 버튼 없이 포커스 아웃 시 자동 저장 지향.
+- **정적 목록**: 순서 변경 및 활성화 토글 기능 제외.
 - **핸들(@) 미사용**: URL 경로에 `@` 기호를 사용하지 않음.
