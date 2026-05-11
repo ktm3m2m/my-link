@@ -1,18 +1,26 @@
 "use client"
 
-import { dummyLinks } from "@/data/links"
+import { useState } from "react"
+import { dummyLinks, Link } from "@/data/links"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { ShareNetwork, ArrowUpRight, DotsThreeVertical } from "@phosphor-icons/react"
+import { AddLinkDialog } from "@/components/add-link-dialog"
+import { ShareNetwork, ArrowUpRight } from "@phosphor-icons/react"
 
 export default function Page() {
+  const [links, setLinks] = useState<Link[]>(dummyLinks)
+
   // PRD의 User 모델 예시 데이터
   const user = {
     username: "Caesium Y",
     displayName: "caesiumy",
     bio: "Frontend Developer & UI Explorer. Building minimal things for the web.",
     photoURL: "https://github.com/shadcn.png", // 실제로는 구글 프로필 URL이 들어옵니다.
+  }
+
+  const handleAddLink = (newLink: Link) => {
+    setLinks([newLink, ...links])
   }
 
   return (
@@ -42,9 +50,14 @@ export default function Page() {
         </div>
       </section>
 
-      {/* 링크 목록 섹션 */}
+      {/* 링크 관리 및 목록 섹션 */}
       <section className="flex w-full max-w-md flex-col gap-4 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-        {dummyLinks.map((link) => (
+        {/* 링크 추가 버튼 (다이얼로그) */}
+        <div className="mb-4">
+          <AddLinkDialog onAdd={handleAddLink} />
+        </div>
+
+        {links.map((link) => (
           <a
             key={link.id}
             href={link.url}
@@ -90,3 +103,4 @@ export default function Page() {
     </main>
   )
 }
+
