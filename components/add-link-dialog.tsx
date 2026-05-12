@@ -26,10 +26,32 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
   const [title, setTitle] = useState("")
   const [url, setUrl] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errors, setErrors] = useState<{ title?: string; url?: string }>({})
+
+  const validate = () => {
+    const newErrors: { title?: string; url?: string } = {}
+    
+    if (title.trim().length < 2) {
+      newErrors.title = "제목은 최소 2글자 이상 입력해주세요."
+    } else if (title.length > 30) {
+      newErrors.title = "제목은 30글자 이내로 입력해주세요."
+    }
+
+    try {
+      const urlToTest = url.startsWith("http") ? url : `https://${url}`
+      new URL(urlToTest)
+    } catch (e) {
+      newErrors.url = "올바른 URL 형식이 아닙니다 (예: google.com)"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title || !url) return
+    
+    if (!validate()) return
 
     setIsSubmitting(true)
     
@@ -38,19 +60,25 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
 
     const newLink: Link = {
       id: Math.random().toString(36).substring(2, 11),
-      title,
+      title: title.trim(),
       url: url.startsWith("http") ? url : `https://${url}`,
     }
 
     onAdd(newLink)
     setTitle("")
     setUrl("")
+    setErrors({})
     setIsSubmitting(false)
     setOpen(false)
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(val) => {
+      setOpen(val)
+      if (!val) {
+        setErrors({}) // 다이얼로그 닫을 때 에러 초기화
+      }
+    }}>
       <DialogTrigger
         render={
           <Button
@@ -93,12 +121,22 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
               <Input
                 id="title"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value)
+                  if (errors.title) setErrors({ ...errors, title: undefined })
+                }}
                 placeholder="예: 나의 블로그, 포트폴리오"
-                className="h-14 rounded-2xl bg-muted/30 border-2 border-transparent focus-visible:border-primary/20 focus-visible:bg-background transition-all pl-4 text-sm font-semibold"
-                required
+                className={cn(
+                  "h-14 rounded-2xl bg-muted/30 border-2 border-transparent focus-visible:border-primary/20 focus-visible:bg-background transition-all pl-4 text-sm font-semibold",
+                  errors.title && "border-destructive/30 bg-destructive/5"
+                )}
                 disabled={isSubmitting}
               />
+              {errors.title && (
+                <p className="text-[10px] text-destructive font-bold mt-1.5 pl-1 animate-in fade-in slide-in-from-top-1">
+                  {errors.title}
+                </p>
+              )}
             </div>
           </div>
           
@@ -110,16 +148,25 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
               <Input
                 id="url"
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={(e) => {
+                  setUrl(e.target.value)
+                  if (errors.url) setErrors({ ...errors, url: undefined })
+                }}
                 placeholder="https://example.com"
-                className="h-14 rounded-2xl bg-muted/30 border-2 border-transparent focus-visible:border-primary/20 focus-visible:bg-background transition-all pl-4 text-sm font-semibold pr-10"
-                required
+                className={cn(
+                  "h-14 rounded-2xl bg-muted/30 border-2 border-transparent focus-visible:border-primary/20 focus-visible:bg-background transition-all pl-4 text-sm font-semibold pr-10",
+                  errors.url && "border-destructive/30 bg-destructive/5"
+                )}
                 disabled={isSubmitting}
-                type="url"
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/30">
                 <PaperPlaneTilt size={18} weight="bold" />
               </div>
+              {errors.url && (
+                <p className="text-[10px] text-destructive font-bold mt-1.5 pl-1 animate-in fade-in slide-in-from-top-1">
+                  {errors.url}
+                </p>
+              )}
             </div>
           </div>
 
