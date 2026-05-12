@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus } from "@phosphor-icons/react"
+import { Plus, Link as LinkIcon, PaperPlaneTilt, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Link } from "@/data/links"
+import { cn } from "@/lib/utils"
 
 interface AddLinkDialogProps {
   onAdd: (link: Link) => void
@@ -24,13 +25,19 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [url, setUrl] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title || !url) return
 
+    setIsSubmitting(true)
+    
+    // 시뮬레이션: 약간의 딜레이를 주어 실제 서버와 통신하는 느낌을 줌
+    await new Promise((resolve) => setTimeout(resolve, 600))
+
     const newLink: Link = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       title,
       url: url.startsWith("http") ? url : `https://${url}`,
     }
@@ -38,6 +45,7 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
     onAdd(newLink)
     setTitle("")
     setUrl("")
+    setIsSubmitting(false)
     setOpen(false)
   }
 
@@ -47,46 +55,84 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
         render={
           <Button
             variant="default"
-            className="w-full h-14 rounded-2xl font-bold gap-2 shadow-lg shadow-primary/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full h-14 rounded-2xl font-bold gap-3 shadow-xl shadow-primary/20 transition-all hover:scale-[1.01] hover:shadow-2xl active:scale-[0.99] bg-primary text-primary-foreground group"
           >
-            <Plus size={20} weight="bold" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-foreground/20 group-hover:rotate-90 transition-transform duration-300">
+              <Plus size={14} weight="bold" />
+            </div>
             새 링크 추가하기
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-[425px] rounded-3xl border-none shadow-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold tracking-tight">새 링크 추가</DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground/80 font-medium">
-            공유하고 싶은 링크의 제목과 URL을 입력해주세요.
+      <DialogContent className="sm:max-w-[420px] rounded-[2rem] border-none shadow-2xl bg-background/95 backdrop-blur-xl p-8">
+        <DialogHeader className="gap-2">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-2">
+            <LinkIcon size={24} weight="duotone" />
+          </div>
+          <DialogTitle className="text-2xl font-bold tracking-tight">새 링크 추가</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground/80 font-medium leading-relaxed">
+            나의 새로운 링크를 세상에 공유해보세요.<br />제목과 URL만 있으면 충분합니다.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-6 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="title" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">제목</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 내 인스타그램, 포트폴리오 등"
-              className="h-12 rounded-xl bg-muted/50 border-none ring-1 ring-foreground/5 focus-visible:ring-primary/20 focus-visible:bg-background transition-all"
-              required
-            />
+
+        <form onSubmit={handleSubmit} className="grid gap-6 py-6">
+          <div className="grid gap-2.5">
+            <Label htmlFor="title" className="text-[11px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 pl-1">
+              링크 제목
+            </Label>
+            <div className="relative group">
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="예: 나의 블로그, 포트폴리오"
+                className="h-14 rounded-2xl bg-muted/30 border-2 border-transparent focus-visible:border-primary/20 focus-visible:bg-background transition-all pl-4 text-sm font-semibold"
+                required
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="url" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">URL</Label>
-            <Input
-              id="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com"
-              className="h-12 rounded-xl bg-muted/50 border-none ring-1 ring-foreground/5 focus-visible:ring-primary/20 focus-visible:bg-background transition-all"
-              required
-            />
+          
+          <div className="grid gap-2.5">
+            <Label htmlFor="url" className="text-[11px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 pl-1">
+              URL 주소
+            </Label>
+            <div className="relative">
+              <Input
+                id="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com"
+                className="h-14 rounded-2xl bg-muted/30 border-2 border-transparent focus-visible:border-primary/20 focus-visible:bg-background transition-all pl-4 text-sm font-semibold pr-10"
+                required
+                disabled={isSubmitting}
+                type="url"
+              />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/30">
+                <PaperPlaneTilt size={18} weight="bold" />
+              </div>
+            </div>
           </div>
-          <DialogFooter className="pt-2">
-            <Button type="submit" className="w-full h-12 rounded-xl font-bold text-base">
-              추가하기
+
+          <DialogFooter className="flex-col sm:flex-col gap-3 pt-2">
+            <Button 
+              type="submit" 
+              className={cn(
+                "w-full h-14 rounded-2xl font-bold text-base transition-all duration-300",
+                isSubmitting ? "opacity-80 scale-[0.98]" : "hover:scale-[1.02]"
+              )}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "추가 중..." : "링크 생성 완료"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setOpen(false)}
+              className="w-full h-12 rounded-xl text-muted-foreground hover:text-foreground font-medium"
+              disabled={isSubmitting}
+            >
+              취소
             </Button>
           </DialogFooter>
         </form>
