@@ -1,7 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Link as LinkIcon, PaperPlaneTilt, X } from "@phosphor-icons/react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { Plus, Link as LinkIcon, PaperPlaneTilt } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -17,57 +20,59 @@ import { Label } from "@/components/ui/label"
 import { Link } from "@/data/links"
 import { cn } from "@/lib/utils"
 
+// Zod 스키마 정의
+const linkFormSchema = z.object({
+  title: z
+    .string()
+    .min(2, { message: "제목은 최소 2글자 이상 입력해주세요." })
+    .max(30, { message: "제목은 30글자 이내로 입력해주세요." }),
+  url: z
+    .string()
+    .min(1, { message: "URL을 입력해주세요." })
+    .refine((val) => {
+      try {
+        const urlToTest = val.startsWith("http") ? val : `https://${val}`
+        new URL(urlToTest)
+        return true
+      } catch (e) {
+        return false
+      }
+    }, { message: "올바른 URL 형식이 아닙니다 (예: google.com)" }),
+})
+
+type LinkFormValues = z.infer<typeof linkFormSchema>
+
 interface AddLinkDialogProps {
   onAdd: (link: Link) => void
 }
 
 export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
   const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState("")
-  const [url, setUrl] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errors, setErrors] = useState<{ title?: string; url?: string }>({})
 
-  const validate = () => {
-    const newErrors: { title?: string; url?: string } = {}
-    
-    if (title.trim().length < 2) {
-      newErrors.title = "제목은 최소 2글자 이상 입력해주세요."
-    } else if (title.length > 30) {
-      newErrors.title = "제목은 30글자 이내로 입력해주세요."
-    }
+  // React Hook Form 초기화
+  const form = useForm<LinkFormValues>({
+    resolver: zodResolver(linkFormSchema),
+    defaultValues: {
+      title: "",
+      url: "",
+    },
+  })
 
-    try {
-      const urlToTest = url.startsWith("http") ? url : `https://${url}`
-      new URL(urlToTest)
-    } catch (e) {
-      newErrors.url = "올바른 URL 형식이 아닙니다 (예: google.com)"
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validate()) return
-
+  const onSubmit = async (values: LinkFormValues) => {
     setIsSubmitting(true)
     
-    // 시뮬레이션: 약간의 딜레이를 주어 실제 서버와 통신하는 느낌을 줌
+    // 시뮬레이션: 약간의 딜레이
     await new Promise((resolve) => setTimeout(resolve, 600))
 
     const newLink: Link = {
       id: Math.random().toString(36).substring(2, 11),
-      title: title.trim(),
-      url: url.startsWith("http") ? url : `https://${url}`,
+      title: values.title.trim(),
+      url: values.url.startsWith("http") ? values.url : `https://${values.url}`,
     }
 
     onAdd(newLink)
-    setTitle("")
-    setUrl("")
-    setErrors({})
+    form.reset()
     setIsSubmitting(false)
     setOpen(false)
   }
@@ -76,7 +81,7 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
     <Dialog open={open} onOpenChange={(val) => {
       setOpen(val)
       if (!val) {
-        setErrors({}) // 다이얼로그 닫을 때 에러 초기화
+        form.reset() // 다이얼로그 닫을 때 폼 초기화
       }
     }}>
       <DialogTrigger
@@ -85,18 +90,13 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
             variant="default"
             className="w-full h-16 rounded-[1.25rem] font-bold gap-3 shadow-2xl shadow-primary/20 transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-br from-primary via-primary to-primary/80 text-primary-foreground group relative overflow-hidden p-0"
           >
-            {/* 버튼 내부 레이아웃 */}
             <div className="flex items-center justify-center w-full h-full gap-3 px-6 z-10">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md shadow-inner transition-all duration-500 group-hover:rotate-90 group-hover:bg-white/30 group-hover:scale-110">
                 <Plus size={18} weight="bold" />
               </div>
               <span className="text-lg tracking-tight">새로운 링크 추가하기</span>
             </div>
-
-            {/* 프리미엄 효과: 광택 애니메이션 */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer transition-transform" />
-            
-            {/* 하단 글로우 효과 */}
             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </Button>
         }
@@ -112,7 +112,7 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid gap-6 py-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6 py-6">
           <div className="grid gap-2.5">
             <Label htmlFor="title" className="text-[11px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 pl-1">
               링크 제목
@@ -120,21 +120,17 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
             <div className="relative group">
               <Input
                 id="title"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value)
-                  if (errors.title) setErrors({ ...errors, title: undefined })
-                }}
+                {...form.register("title")}
                 placeholder="예: 나의 블로그, 포트폴리오"
                 className={cn(
                   "h-14 rounded-2xl bg-muted/30 border-2 border-transparent focus-visible:border-primary/20 focus-visible:bg-background transition-all pl-4 text-sm font-semibold",
-                  errors.title && "border-destructive/30 bg-destructive/5"
+                  form.formState.errors.title && "border-destructive/30 bg-destructive/5"
                 )}
                 disabled={isSubmitting}
               />
-              {errors.title && (
+              {form.formState.errors.title && (
                 <p className="text-[10px] text-destructive font-bold mt-1.5 pl-1 animate-in fade-in slide-in-from-top-1">
-                  {errors.title}
+                  {form.formState.errors.title.message}
                 </p>
               )}
             </div>
@@ -147,24 +143,20 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
             <div className="relative">
               <Input
                 id="url"
-                value={url}
-                onChange={(e) => {
-                  setUrl(e.target.value)
-                  if (errors.url) setErrors({ ...errors, url: undefined })
-                }}
+                {...form.register("url")}
                 placeholder="https://example.com"
                 className={cn(
                   "h-14 rounded-2xl bg-muted/30 border-2 border-transparent focus-visible:border-primary/20 focus-visible:bg-background transition-all pl-4 text-sm font-semibold pr-10",
-                  errors.url && "border-destructive/30 bg-destructive/5"
+                  form.formState.errors.url && "border-destructive/30 bg-destructive/5"
                 )}
                 disabled={isSubmitting}
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/30">
                 <PaperPlaneTilt size={18} weight="bold" />
               </div>
-              {errors.url && (
+              {form.formState.errors.url && (
                 <p className="text-[10px] text-destructive font-bold mt-1.5 pl-1 animate-in fade-in slide-in-from-top-1">
-                  {errors.url}
+                  {form.formState.errors.url.message}
                 </p>
               )}
             </div>
