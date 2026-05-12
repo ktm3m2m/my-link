@@ -55,12 +55,21 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
         render={
           <Button
             variant="default"
-            className="w-full h-14 rounded-2xl font-bold gap-3 shadow-xl shadow-primary/20 transition-all hover:scale-[1.01] hover:shadow-2xl active:scale-[0.99] bg-primary text-primary-foreground group"
+            className="w-full h-16 rounded-[1.25rem] font-bold gap-3 shadow-2xl shadow-primary/20 transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-br from-primary via-primary to-primary/80 text-primary-foreground group relative overflow-hidden p-0"
           >
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-foreground/20 group-hover:rotate-90 transition-transform duration-300">
-              <Plus size={14} weight="bold" />
+            {/* 버튼 내부 레이아웃 */}
+            <div className="flex items-center justify-center w-full h-full gap-3 px-6 z-10">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md shadow-inner transition-all duration-500 group-hover:rotate-90 group-hover:bg-white/30 group-hover:scale-110">
+                <Plus size={18} weight="bold" />
+              </div>
+              <span className="text-lg tracking-tight">새로운 링크 추가하기</span>
             </div>
-            새 링크 추가하기
+
+            {/* 프리미엄 효과: 광택 애니메이션 */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer transition-transform" />
+            
+            {/* 하단 글로우 효과 */}
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </Button>
         }
       />
