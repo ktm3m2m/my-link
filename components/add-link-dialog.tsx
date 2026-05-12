@@ -24,20 +24,19 @@ import { cn } from "@/lib/utils"
 const linkFormSchema = z.object({
   title: z
     .string()
-    .min(2, { message: "제목은 최소 2글자 이상 입력해주세요." })
-    .max(30, { message: "제목은 30글자 이내로 입력해주세요." }),
+    .min(1, { message: "제목을 입력해주세요." }), // 최소 1자 이상만 요구 (제한 제거)
   url: z
     .string()
     .min(1, { message: "URL을 입력해주세요." })
     .refine((val) => {
       try {
         const urlToTest = val.startsWith("http") ? val : `https://${val}`
-        new URL(urlToTest)
-        return true
+        const url = new URL(urlToTest)
+        return url.hostname.includes(".") // 최소한 도메인 형태를 갖췄는지 확인
       } catch (e) {
         return false
       }
-    }, { message: "올바른 URL 형식이 아닙니다 (예: google.com)" }),
+    }, { message: "올바른 URL 형식이 아닙니다 (예: google.com 또는 https://naver.com)" }),
 })
 
 type LinkFormValues = z.infer<typeof linkFormSchema>
@@ -50,9 +49,10 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // React Hook Form 초기화
+  // React Hook Form 초기화 (실시간 검증 모드 추가)
   const form = useForm<LinkFormValues>({
     resolver: zodResolver(linkFormSchema),
+    mode: "onChange", // 입력 시 실시간으로 검증 수행
     defaultValues: {
       title: "",
       url: "",
