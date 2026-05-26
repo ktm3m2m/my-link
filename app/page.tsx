@@ -14,24 +14,77 @@ import {
   addDoc, 
   deleteDoc, 
   doc, 
+  setDoc,
   query, 
   orderBy, 
   onSnapshot,
   serverTimestamp 
 } from "firebase/firestore"
+import { toast } from "sonner"
+import { Skeleton } from "@/components/ui/skeleton"
+
+interface ExtendedLink extends Link {
+  createdAt: Date
+}
+
+interface UserProfile {
+  username: string
+  displayName: string
+  bio: string
+  photoURL: string
+}
 
 export default function Page() {
-  const [links, setLinks] = useState<Link[]>([])
+  const [links, setLinks] = useState<ExtendedLink[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [isProfileLoading, setIsProfileLoading] = useState(true)
 
-  // PRD의 User 모델 예시 데이터
-  const user = {
-    username: "Caesium Y",
-    displayName: "caesiumy",
-    bio: "Frontend Developer & UI Explorer. Building minimal things for the web.",
-    photoURL: "https://github.com/shadcn.png", // 실제로는 구글 프로필 URL이 들어옵니다.
-  }
+  // 인라인 편집 관련 상태
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [isEditingBio, setIsEditingBio] = useState(false)
+  const [tempName, setTempName] = useState("")
+  const [tempBio, setTempBio] = useState("")
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
 
+  // 프로필 데이터 실시간 구독
+  useEffect(() => {
+    const docRef = doc(db, "users", "anonymous")
+    const unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setProfile({
+            username: docSnap.data().username || "이름 없음",
+            displayName: docSnap.data().displayName || "anonymous",
+            bio: docSnap.data().bio || "소개글이 없습니다.",
+            photoURL: docSnap.data().photoURL || "https://github.com/shadcn.png"
+          })
+        } else {
+          // 최초 문서가 없을 때 기본값 제공
+          const defaultProfile = {
+            username: "Caesium Y",
+            displayName: "caesiumy",
+            bio: "Frontend Developer & UI Explorer. Building minimal things for the web.",
+            photoURL: "https://github.com/shadcn.png",
+          }
+          setProfile(defaultProfile)
+          // DB에 기본 문서 생성
+          setDoc(docRef, defaultProfile, { merge: true }).catch(console.error)
+        }
+        setIsProfileLoading(false)
+      },
+      (error) => {
+        console.error("Firestore에서 프로필을 가져오는 중 오류 발생:", error)
+        toast.error("프로필 데이터를 불러오지 못했습니다.")
+        setIsProfileLoading(false)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [])
+
+  // 링크 목록 실시간 구독
   useEffect(() => {
     const q = query(
       collection(db, "users", "anonymous", "links"),
@@ -41,17 +94,28 @@ export default function Page() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const fetchedLinks = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          title: doc.data().title || "",
-          url: doc.data().url || "",
-          icon: doc.data().icon || "",
-        })) as Link[]
+        const fetchedLinks = snapshot.docs.map((doc) => {
+          const data = doc.data()
+          // serverTimestamp() 계산 대기 중에 로컬 캐시로 null이 반환되면 현재 시간으로 대체하여 깜빡임과 뒤틀림 방지
+          const createdAtDate = data.createdAt ? data.createdAt.toDate() : new Date()
+          return {
+            id: doc.id,
+            title: data.title || "",
+            url: data.url || "",
+            icon: data.icon || "",
+            createdAt: createdAtDate,
+          }
+        })
+        
+        // 클라이언트 단에서 확실히 정렬 순서 고정
+        fetchedLinks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        
         setLinks(fetchedLinks)
         setIsLoading(false)
       },
       (error) => {
         console.error("Firestore에서 링크를 가져오는 중 오류 발생:", error)
+        toast.error("링크 목록을 불러오지 못했습니다.")
         setIsLoading(false)
       }
     )
@@ -66,8 +130,10 @@ export default function Page() {
         url: newLink.url,
         createdAt: serverTimestamp(),
       })
+      toast.success("새로운 링크가 추가되었습니다.")
     } catch (error) {
       console.error("Firestore에 링크 추가 중 오류 발생:", error)
+      toast.error("링크 추가에 실패했습니다.")
       throw error
     }
   }
@@ -75,8 +141,57 @@ export default function Page() {
   const handleDeleteLink = async (id: string) => {
     try {
       await deleteDoc(doc(db, "users", "anonymous", "links", id))
+      toast.success("링크가 삭제되었습니다.")
     } catch (error) {
       console.error("Firestore에서 링크 삭제 중 오류 발생:", error)
+      toast.error("링크 삭제에 실패했습니다.")
+    }
+  }
+
+  // 프로필 업데이트 처리
+  const handleUpdateName = async () => {
+    setIsEditingName(false)
+    const trimmed = tempName.trim()
+    if (!trimmed) {
+      toast.error("이름은 빈 칸으로 둘 수 없습니다.")
+      return
+    }
+    if (trimmed === profile?.username) return
+
+    try {
+      setIsUpdatingProfile(true)
+      await setDoc(
+        doc(db, "users", "anonymous"),
+        { username: trimmed },
+        { merge: true }
+      )
+      toast.success("표시 이름이 수정되었습니다.")
+    } catch (error) {
+      console.error("이름 업데이트 중 오류 발생:", error)
+      toast.error("이름을 저장하지 못했습니다.")
+    } finally {
+      setIsUpdatingProfile(false)
+    }
+  }
+
+  const handleUpdateBio = async () => {
+    setIsEditingBio(false)
+    const trimmed = tempBio.trim()
+    if (trimmed === profile?.bio) return
+
+    try {
+      setIsUpdatingProfile(true)
+      await setDoc(
+        doc(db, "users", "anonymous"),
+        { bio: trimmed },
+        { merge: true }
+      )
+      toast.success("한 줄 소개가 수정되었습니다.")
+    } catch (error) {
+      console.error("한 줄 소개 업데이트 중 오류 발생:", error)
+      toast.error("한 줄 소개를 저장하지 못했습니다.")
+    } finally {
+      setIsUpdatingProfile(false)
     }
   }
 
@@ -90,28 +205,95 @@ export default function Page() {
       </div>
 
       {/* 프로필 섹션 */}
-      <section className="mb-16 flex flex-col items-center gap-8 text-center animate-in fade-in slide-in-from-bottom-8 duration-1000 ease-out">
-        <div className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-          <Avatar className="h-32 w-32 ring-4 ring-background relative">
-            <AvatarImage src={user.photoURL} alt={user.username} className="object-cover" />
-            <AvatarFallback className="text-3xl font-black bg-muted">{user.username[0]}</AvatarFallback>
-          </Avatar>
-        </div>
-        
-        <div className="space-y-4 max-w-sm">
-          <div className="space-y-2">
-            <h1 className="text-4xl font-black tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
-              {user.username}
-            </h1>
-            <p className="text-sm font-black text-primary uppercase tracking-[0.3em] inline-block px-3 py-1 bg-primary/5 rounded-full">
-              @{user.displayName}
-            </p>
+      <section className="mb-16 flex flex-col items-center gap-8 text-center animate-in fade-in slide-in-from-bottom-8 duration-1000 ease-out w-full max-w-sm">
+        {isProfileLoading ? (
+          <div className="flex flex-col items-center gap-6 w-full">
+            <Skeleton className="h-32 w-32 rounded-full" />
+            <div className="space-y-3 w-full flex flex-col items-center">
+              <Skeleton className="h-8 w-48 rounded-xl" />
+              <Skeleton className="h-6 w-32 rounded-full" />
+              <Skeleton className="h-12 w-full rounded-2xl" />
+            </div>
           </div>
-          <p className="text-base leading-relaxed text-muted-foreground/80 font-medium px-6">
-            {user.bio}
-          </p>
-        </div>
+        ) : (
+          <>
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              <Avatar className="h-32 w-32 ring-4 ring-background relative">
+                <AvatarImage src={profile?.photoURL} alt={profile?.username} className="object-cover" />
+                <AvatarFallback className="text-3xl font-black bg-muted">{profile?.username?.[0]}</AvatarFallback>
+              </Avatar>
+            </div>
+            
+            <div className="space-y-4 w-full">
+              <div className="space-y-2 flex flex-col items-center justify-center">
+                {isEditingName ? (
+                  <div className="relative w-full max-w-xs flex items-center justify-center">
+                    <input
+                      type="text"
+                      value={tempName}
+                      onChange={(e) => setTempName(e.target.value)}
+                      onBlur={handleUpdateName}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleUpdateName()
+                      }}
+                      autoFocus
+                      className="text-3xl font-black tracking-tight text-center bg-background border-b-2 border-primary focus:outline-none w-full px-2 py-1 rounded-md"
+                      disabled={isUpdatingProfile}
+                    />
+                  </div>
+                ) : (
+                  <h1 
+                    className="text-4xl font-black tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-all select-none border-b-2 border-transparent hover:border-foreground/20"
+                    onClick={() => {
+                      setTempName(profile?.username || "")
+                      setIsEditingName(true)
+                    }}
+                    title="클릭하여 이름 수정"
+                  >
+                    {profile?.username}
+                  </h1>
+                )}
+                <p className="text-sm font-black text-primary uppercase tracking-[0.3em] inline-block px-3 py-1 bg-primary/5 rounded-full select-none mt-2">
+                  @{profile?.displayName}
+                </p>
+              </div>
+              
+              <div className="px-6 flex justify-center w-full">
+                {isEditingBio ? (
+                  <textarea
+                    value={tempBio}
+                    onChange={(e) => setTempBio(e.target.value)}
+                    onBlur={handleUpdateBio}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        handleUpdateBio()
+                      }
+                    }}
+                    autoFocus
+                    rows={3}
+                    maxLength={150}
+                    className="text-sm text-center bg-background border-2 border-primary/20 rounded-2xl focus:border-primary focus:outline-none p-3 w-full resize-none font-medium leading-relaxed"
+                    placeholder="소개글을 입력하고 바깥을 클릭해 저장하세요 (최대 150자)"
+                    disabled={isUpdatingProfile}
+                  />
+                ) : (
+                  <p 
+                    className="text-base leading-relaxed text-muted-foreground/80 font-medium cursor-pointer hover:text-foreground transition-all select-none border border-transparent hover:border-foreground/5 hover:bg-foreground/5 rounded-2xl px-4 py-2 text-center w-full"
+                    onClick={() => {
+                      setTempBio(profile?.bio || "")
+                      setIsEditingBio(true)
+                    }}
+                    title="클릭하여 소개글 수정"
+                  >
+                    {profile?.bio}
+                  </p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </section>
 
       {/* 링크 관리 및 목록 섹션 */}
@@ -212,4 +394,5 @@ export default function Page() {
     </main>
   )
 }
+
 
