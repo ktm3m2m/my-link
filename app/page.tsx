@@ -29,6 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 interface ExtendedLink extends Link {
   createdAt: Date
+  updatedAt?: Date
 }
 
 interface UserProfile {
@@ -173,6 +174,7 @@ export default function Page() {
         url: newLink.url,
         icon: newLink.icon || "",
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
       toast.success("새로운 링크가 추가되었습니다.");
     } catch (error) {
@@ -225,7 +227,8 @@ export default function Page() {
     try {
       await setDoc(doc(db, "users", "anonymous", "links", editingLinkId), {
         title: editTitle.trim(),
-        url: editUrl.trim()
+        url: editUrl.trim(),
+        updatedAt: serverTimestamp()
       }, { merge: true });
       toast.success("링크가 수정되었습니다.");
     } catch (error) {
