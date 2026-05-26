@@ -1,16 +1,28 @@
 "use client"
 
-import { useState } from "react"
-import { dummyLinks, Link } from "@/data/links"
+import { useState, useEffect } from "react"
+import { Link } from "@/data/links"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { AddLinkDialog } from "@/components/add-link-dialog"
-import { ShareNetwork, ArrowUpRight, Trash } from "@phosphor-icons/react"
+import { ShareNetwork, ArrowUpRight, Trash, CircleNotch } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
+import { db } from "@/lib/firebase"
+import { 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  orderBy, 
+  onSnapshot,
+  serverTimestamp 
+} from "firebase/firestore"
 
 export default function Page() {
-  const [links, setLinks] = useState<Link[]>(dummyLinks)
+  const [links, setLinks] = useState<Link[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   // PRD의 User 모델 예시 데이터
   const user = {
@@ -20,12 +32,52 @@ export default function Page() {
     photoURL: "https://github.com/shadcn.png", // 실제로는 구글 프로필 URL이 들어옵니다.
   }
 
-  const handleAddLink = (newLink: Link) => {
-    setLinks([newLink, ...links])
+  useEffect(() => {
+    const q = query(
+      collection(db, "users", "anonymous", "links"),
+      orderBy("createdAt", "desc")
+    )
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedLinks = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          title: doc.data().title || "",
+          url: doc.data().url || "",
+          icon: doc.data().icon || "",
+        })) as Link[]
+        setLinks(fetchedLinks)
+        setIsLoading(false)
+      },
+      (error) => {
+        console.error("Firestore에서 링크를 가져오는 중 오류 발생:", error)
+        setIsLoading(false)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [])
+
+  const handleAddLink = async (newLink: Omit<Link, "id">) => {
+    try {
+      await addDoc(collection(db, "users", "anonymous", "links"), {
+        title: newLink.title,
+        url: newLink.url,
+        createdAt: serverTimestamp(),
+      })
+    } catch (error) {
+      console.error("Firestore에 링크 추가 중 오류 발생:", error)
+      throw error
+    }
   }
 
-  const handleDeleteLink = (id: string) => {
-    setLinks(links.filter((link) => link.id !== id))
+  const handleDeleteLink = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "users", "anonymous", "links", id))
+    } catch (error) {
+      console.error("Firestore에서 링크 삭제 중 오류 발생:", error)
+    }
   }
 
   return (
@@ -70,68 +122,84 @@ export default function Page() {
         </div>
 
         <div className="flex flex-col gap-4">
-          {links.map((link, index) => (
-            <div
-              key={link.id}
-              className="group relative"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <a
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <Card className="relative overflow-hidden cursor-pointer border-none bg-background/50 backdrop-blur-md ring-1 ring-foreground/5 transition-all duration-500 hover:ring-primary/30 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-1">
-                  <CardContent className="flex items-center gap-5 py-5 pr-14 pl-5">
-                    {/* 파비콘 자동 로드 영역 */}
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/50 ring-1 ring-foreground/5 overflow-hidden group-hover:ring-primary/20 transition-all duration-500">
-                      <img 
-                        src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=128`}
-                        alt={link.title}
-                        className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
-                      />
-                    </div>
-                    
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-base font-bold tracking-tight truncate group-hover:text-primary transition-colors">
-                        {link.title}
-                      </span>
-                      <span className="text-xs text-muted-foreground/60 truncate font-medium mt-0.5">
-                        {new URL(link.url).hostname}
-                      </span>
-                    </div>
-
-                    {/* 우측 상단 화살표 아이콘 */}
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-500 text-primary">
-                      <ArrowUpRight size={20} weight="bold" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </a>
-
-              {/* 삭제 버튼 (호버 시 표시) */}
-              <Button
-                variant="destructive"
-                size="icon"
-                className="absolute -right-12 top-1/2 -translate-y-1/2 h-10 w-10 rounded-xl opacity-0 group-hover:opacity-100 group-hover:-right-3 transition-all duration-300 shadow-lg shadow-destructive/20 z-10"
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleDeleteLink(link.id)
-                }}
-              >
-                <Trash size={18} weight="bold" />
-              </Button>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <CircleNotch size={32} className="animate-spin text-primary opacity-60" />
+              <p className="text-xs text-muted-foreground/60 font-semibold">링크 목록을 불러오는 중...</p>
             </div>
-          ))}
-        </div>
+          ) : links.length > 0 ? (
+            links.map((link, index) => {
+              let hostname = ""
+              try {
+                hostname = new URL(link.url).hostname
+              } catch (e) {
+                hostname = link.url
+              }
+              
+              return (
+                <div
+                  key={link.id}
+                  className="group relative"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <Card className="relative overflow-hidden cursor-pointer border-none bg-background/50 backdrop-blur-md ring-1 ring-foreground/5 transition-all duration-500 hover:ring-primary/30 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-1">
+                      <CardContent className="flex items-center gap-5 py-5 pr-14 pl-5">
+                        {/* 파비콘 자동 로드 영역 */}
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/50 ring-1 ring-foreground/5 overflow-hidden group-hover:ring-primary/20 transition-all duration-500">
+                          {hostname && (
+                            <img 
+                              src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=128`}
+                              alt={link.title}
+                              className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
+                            />
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-base font-bold tracking-tight truncate group-hover:text-primary transition-colors">
+                            {link.title}
+                          </span>
+                          <span className="text-xs text-muted-foreground/60 truncate font-medium mt-0.5">
+                            {hostname}
+                          </span>
+                        </div>
 
-        {links.length === 0 && (
-          <div className="py-20 text-center space-y-4 opacity-50">
-            <div className="text-4xl">🌵</div>
-            <p className="text-sm font-medium">아직 등록된 링크가 없습니다.<br />새로운 링크를 추가해보세요!</p>
-          </div>
-        )}
+                        {/* 우측 상단 화살표 아이콘 */}
+                        <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-500 text-primary">
+                          <ArrowUpRight size={20} weight="bold" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </a>
+
+                  {/* 삭제 버튼 (호버 시 표시) */}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -right-12 top-1/2 -translate-y-1/2 h-10 w-10 rounded-xl opacity-0 group-hover:opacity-100 group-hover:-right-3 transition-all duration-300 shadow-lg shadow-destructive/20 z-10"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      handleDeleteLink(link.id)
+                    }}
+                  >
+                    <Trash size={18} weight="bold" />
+                  </Button>
+                </div>
+              )
+            })
+          ) : (
+            <div className="py-20 text-center space-y-4 opacity-50">
+              <div className="text-4xl">🌵</div>
+              <p className="text-sm font-medium">아직 등록된 링크가 없습니다.<br />새로운 링크를 추가해보세요!</p>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* 푸터 */}

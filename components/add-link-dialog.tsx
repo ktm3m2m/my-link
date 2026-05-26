@@ -42,7 +42,7 @@ const linkFormSchema = z.object({
 type LinkFormValues = z.infer<typeof linkFormSchema>
 
 interface AddLinkDialogProps {
-  onAdd: (link: Link) => void
+  onAdd: (link: Omit<Link, "id">) => Promise<void>
 }
 
 export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
@@ -62,19 +62,20 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
   const onSubmit = async (values: LinkFormValues) => {
     setIsSubmitting(true)
     
-    // 시뮬레이션: 약간의 딜레이
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    try {
+      const newLink = {
+        title: values.title.trim(),
+        url: values.url.startsWith("http") ? values.url : `https://${values.url}`,
+      }
 
-    const newLink: Link = {
-      id: Math.random().toString(36).substring(2, 11),
-      title: values.title.trim(),
-      url: values.url.startsWith("http") ? values.url : `https://${values.url}`,
+      await onAdd(newLink)
+      form.reset()
+      setOpen(false)
+    } catch (error) {
+      console.error("링크 추가 중 오류:", error)
+    } finally {
+      setIsSubmitting(false)
     }
-
-    onAdd(newLink)
-    form.reset()
-    setIsSubmitting(false)
-    setOpen(false)
   }
 
   return (
