@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Link } from "@/data/links"
+import { Link, dummyLinks } from "@/data/links"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -9,16 +9,18 @@ import { AddLinkDialog } from "@/components/add-link-dialog"
 import { ShareNetwork, ArrowUpRight, Trash, CircleNotch } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { db } from "@/lib/firebase"
-import { 
-  collection, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
   setDoc,
-  query, 
-  orderBy, 
+  query,
+  orderBy,
   onSnapshot,
-  serverTimestamp 
+  serverTimestamp,
+  getDocs,
+  writeBatch
 } from "firebase/firestore"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -49,7 +51,13 @@ export default function Page() {
 
   // 프로필 데이터 실시간 구독
   useEffect(() => {
-    const docRef = doc(db, "users", "anonymous")
+    if (!db) {
+      // Firebase 비활성화 상태 – 더미 데이터만 사용
+      setProfile(null);
+      setIsProfileLoading(false);
+      return;
+    }
+    const docRef = doc(db, "users", "anonymous");
     const unsubscribe = onSnapshot(
       docRef,
       (docSnap) => {
@@ -86,95 +94,154 @@ export default function Page() {
 
   // 링크 목록 실시간 구독
   useEffect(() => {
-    const q = query(
-      collection(db, "users", "anonymous", "links"),
-      orderBy("createdAt", "desc")
-    )
+    if (!db) {
+      // Firestore 비활성화 시 더미 데이터 사용
+      const dummyWithDate = dummyLinks.map((link) => ({
+        ...link,
+        createdAt: new Date(),
+      })) as ExtendedLink[];
+      setLinks(dummyWithDate);
+      setIsLoading(false);
+      return;
+    }
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const fetchedLinks = snapshot.docs.map((doc) => {
-          const data = doc.data()
-          // serverTimestamp() 계산 대기 중에 로컬 캐시로 null이 반환되면 현재 시간으로 대체하여 깜빡임과 뒤틀림 방지
-          const createdAtDate = data.createdAt ? data.createdAt.toDate() : new Date()
-          return {
-            id: doc.id,
-            title: data.title || "",
-            url: data.url || "",
-            icon: data.icon || "",
-            createdAt: createdAtDate,
-          }
-        })
-        
-        // 클라이언트 단에서 확실히 정렬 순서 고정
-        fetchedLinks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-        
-        setLinks(fetchedLinks)
-        setIsLoading(false)
-      },
-      (error) => {
-        console.error("Firestore에서 링크를 가져오는 중 오류 발생:", error)
-        toast.error("링크 목록을 불러오지 못했습니다.")
-        setIsLoading(false)
-      }
-    )
+    const colRef = collection(db, "users", "anonymous", "links");
+    const seedLinksIfEmpty = async () => {
+        const snapshot = await getDocs(colRef);
+        if (snapshot.empty) {
+          console.log("Firestore에 links 컬렉션이 없으므로 dummyLinks 로 시드합니다.");
+          const batch = writeBatch(db);
+          dummyLinks.forEach((link) => {
+            const docRef = doc(colRef);
+            batch.set(docRef, {
+              title: link.title,
+              url: link.url,
+              icon: link.icon || "",
+              createdAt: serverTimestamp(),
+            });
+          });
+          await batch.commit().catch((err) => {
+            console.error("dummyLinks 시드 중 오류 발생:", err);
+          });
+        }
+    };
 
-    return () => unsubscribe()
-  }, [])
+    // 시드 후 실시간 구독 설정
+    let unsubscribe: () => void = () => { };
+    seedLinksIfEmpty().then(() => {
+      unsubscribe = onSnapshot(
+        query(colRef, orderBy("createdAt", "desc")),
+        (snapshot) => {
+          const fetchedLinks = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            const createdAt = data.createdAt?.toDate?.() ?? new Date();
+            return {
+              id: doc.id,
+              title: data.title || "",
+              url: data.url || "",
+              icon: data.icon || "",
+              createdAt,
+            } as ExtendedLink;
+          });
+          // 더미 데이터와 Firestore 데이터를 병합
+          const dummyWithDate = dummyLinks.map((link) => ({
+            ...link,
+            createdAt: new Date(),
+          })) as ExtendedLink[];
+          const combinedLinks = [...dummyWithDate, ...fetchedLinks];
+          // 클라이언트 측 정렬 (createdAt 최신순)
+          combinedLinks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+          setLinks(combinedLinks);
+          setIsLoading(false);
+        },
+        (error) => {
+          console.error("Firestore에서 링크를 가져오는 중 오류 발생:", error);
+          toast.error("링크 목록을 불러오지 못했습니다.");
+          setIsLoading(false);
+        }
+      );
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
 
   const handleAddLink = async (newLink: Omit<Link, "id">) => {
+    if (!db) {
+      // Firebase 비활성화 시, 더미 데이터에 링크 추가
+      const newDummyLink: ExtendedLink = {
+        // @ts-ignore – id generation fallback
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
+        title: newLink.title,
+        url: newLink.url,
+        // icon은 Link에 선택적이므로 그대로 전달 가능
+        icon: newLink.icon || "",
+        createdAt: new Date(),
+      };
+      setLinks(prev => [newDummyLink, ...prev]);
+      toast.success("더미 데이터에 링크가 추가되었습니다.");
+      return;
+    }
     try {
       await addDoc(collection(db, "users", "anonymous", "links"), {
         title: newLink.title,
         url: newLink.url,
+        icon: newLink.icon || "",
         createdAt: serverTimestamp(),
-      })
-      toast.success("새로운 링크가 추가되었습니다.")
+      });
+      toast.success("새로운 링크가 추가되었습니다.");
     } catch (error) {
-      console.error("Firestore에 링크 추가 중 오류 발생:", error)
-      toast.error("링크 추가에 실패했습니다.")
-      throw error
+      console.error("Firestore에 링크 추가 중 오류 발생:", error);
+      toast.error("링크 추가에 실패했습니다.");
     }
-  }
+  };
 
   const handleDeleteLink = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, "users", "anonymous", "links", id))
-      toast.success("링크가 삭제되었습니다.")
-    } catch (error) {
-      console.error("Firestore에서 링크 삭제 중 오류 발생:", error)
-      toast.error("링크 삭제에 실패했습니다.")
+    if (!db) {
+      toast.warning("Firebase가 비활성화되어 있습니다. 삭제는 더미 데이터에만 적용됩니다.");
+      return;
     }
-  }
+    try {
+      await deleteDoc(doc(db, "users", "anonymous", "links", id));
+      toast.success("링크가 삭제되었습니다.");
+    } catch (error) {
+      console.error("Firestore에서 링크 삭제 중 오류 발생:", error);
+      toast.error("링크 삭제에 실패했습니다.");
+    }
+  };
 
   // 프로필 업데이트 처리
   const handleUpdateName = async () => {
-    setIsEditingName(false)
-    const trimmed = tempName.trim()
+    if (!db) {
+      toast.warning("Firebase가 비활성화되었습니다. 프로필 업데이트는 무시됩니다.");
+      return;
+    }
+    setIsEditingName(false);
+    const trimmed = tempName.trim();
     if (!trimmed) {
-      toast.error("이름은 빈 칸으로 둘 수 없습니다.")
-      return
+      toast.error("이름은 빈 칸으로 둘 수 없습니다.");
+      return;
     }
-    if (trimmed === profile?.username) return
-
+    if (trimmed === profile?.username) return;
     try {
-      setIsUpdatingProfile(true)
-      await setDoc(
-        doc(db, "users", "anonymous"),
-        { username: trimmed },
-        { merge: true }
-      )
-      toast.success("표시 이름이 수정되었습니다.")
+      setIsUpdatingProfile(true);
+      await setDoc(doc(db, "users", "anonymous"), { username: trimmed }, { merge: true });
+      toast.success("표시 이름이 수정되었습니다.");
     } catch (error) {
-      console.error("이름 업데이트 중 오류 발생:", error)
-      toast.error("이름을 저장하지 못했습니다.")
+      console.error("이름 업데이트 중 오류 발생:", error);
+      toast.error("이름을 저장하지 못했습니다.");
     } finally {
-      setIsUpdatingProfile(false)
+      setIsUpdatingProfile(false);
     }
-  }
+  };
 
   const handleUpdateBio = async () => {
+    if (!db) {
+      toast.warning("Firebase가 비활성화되었습니다. 프로필 업데이트는 무시됩니다.");
+      return;
+    }
     setIsEditingBio(false)
     const trimmed = tempBio.trim()
     if (trimmed === profile?.bio) return
@@ -224,7 +291,7 @@ export default function Page() {
                 <AvatarFallback className="text-3xl font-black bg-muted">{profile?.username?.[0]}</AvatarFallback>
               </Avatar>
             </div>
-            
+
             <div className="space-y-4 w-full">
               <div className="space-y-2 flex flex-col items-center justify-center">
                 {isEditingName ? (
@@ -243,7 +310,7 @@ export default function Page() {
                     />
                   </div>
                 ) : (
-                  <h1 
+                  <h1
                     className="text-4xl font-black tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-all select-none border-b-2 border-transparent hover:border-foreground/20"
                     onClick={() => {
                       setTempName(profile?.username || "")
@@ -258,7 +325,7 @@ export default function Page() {
                   @{profile?.displayName}
                 </p>
               </div>
-              
+
               <div className="px-6 flex justify-center w-full">
                 {isEditingBio ? (
                   <textarea
@@ -279,7 +346,7 @@ export default function Page() {
                     disabled={isUpdatingProfile}
                   />
                 ) : (
-                  <p 
+                  <p
                     className="text-base leading-relaxed text-muted-foreground/80 font-medium cursor-pointer hover:text-foreground transition-all select-none border border-transparent hover:border-foreground/5 hover:bg-foreground/5 rounded-2xl px-4 py-2 text-center w-full"
                     onClick={() => {
                       setTempBio(profile?.bio || "")
@@ -317,7 +384,7 @@ export default function Page() {
               } catch (e) {
                 hostname = link.url
               }
-              
+
               return (
                 <div
                   key={link.id}
@@ -335,14 +402,14 @@ export default function Page() {
                         {/* 파비콘 자동 로드 영역 */}
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted/50 ring-1 ring-foreground/5 overflow-hidden group-hover:ring-primary/20 transition-all duration-500">
                           {hostname && (
-                            <img 
+                            <img
                               src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=128`}
                               alt={link.title}
                               className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                             />
                           )}
                         </div>
-                        
+
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="text-base font-bold tracking-tight truncate group-hover:text-primary transition-colors">
                             {link.title}
