@@ -1,40 +1,30 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
 
-let app: any = null;
-let db: any = null;
-let auth: any = null;
-let analytics: Analytics | undefined;
+// Firebase configuration (provided by user)
+const firebaseConfig = {
+  apiKey: "AIzaSyCEWHDt80bMQyVJQw4XvW4uGruQ9Fs6xRU",
+  authDomain: "my-link-51b6b.firebaseapp.com",
+  projectId: "my-link-51b6b",
+  storageBucket: "my-link-51b6b.firebasestorage.app",
+  messagingSenderId: "146552752501",
+  appId: "1:146552752501:web:f68dc9c487253c886c2b3c",
+  measurementId: "G-73HCMGGJPB",
+};
 
-if (
-  process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
-  process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN &&
-  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
-  process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-) {
-  const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-  };
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  db = getFirestore(app);
-  auth = getAuth(app);
-  if (typeof window !== "undefined") {
-    isSupported().then((supported) => {
-      if (supported) {
-        analytics = getAnalytics(app);
-      }
-    });
-  }
-} else {
-  console.warn("Firebase config incomplete – Firestore auth disabled");
+// Initialize Firebase app
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+let analytics: Analytics | undefined;
+if (typeof window !== "undefined") {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  });
 }
 
 export { app, db, auth, analytics };
