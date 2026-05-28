@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Plus, Link as LinkIcon, PaperPlaneTilt } from "@phosphor-icons/react"
+import { Plus, Link as LinkIcon, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -172,7 +172,7 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
               )}
               disabled={isSubmitting}
             >
-              {isSubmitting ? "추가 중..." : "링크 생성 완료"}
+                              {isSubmitting ? <CircleNotch size={16} className="animate-spin" /> : "링크 생성"}
             </Button>
             <Button
               type="button"
