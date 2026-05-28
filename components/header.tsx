@@ -12,11 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Copy, SignOut, CheckCircle } from "@phosphor-icons/react"
+import { Copy, SignOut, CheckCircle, User as UserIcon } from "@phosphor-icons/react"
+import Link from "next/link"
 
 interface HeaderProps {
   user: User | null;
-  profile: { username: string; photoURL: string } | null;
+  profile: { username: string; photoURL: string; displayName?: string } | null;
   onLogin: () => void;
   onLogout: () => void;
 }
@@ -24,7 +25,7 @@ interface HeaderProps {
 export function Header({ user, profile, onLogin, onLogout }: HeaderProps) {
   const handleCopyLink = () => {
     if (!profile?.username && !user?.uid) return;
-    const url = `${window.location.origin}/@${profile?.username || user?.uid}`;
+    const url = `${window.location.origin}/${profile?.displayName || profile?.username || user?.uid}`;
     navigator.clipboard.writeText(url)
       .then(() => {
         toast.custom((t) => (
@@ -55,7 +56,13 @@ export function Header({ user, profile, onLogin, onLogout }: HeaderProps) {
         <div className="flex items-center gap-4">
           {user ? (
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="hidden sm:flex" onClick={() => toast.success("모든 변경 사항이 저장되었습니다.")}>
+              <Link href={`/${profile?.displayName || profile?.username || user.uid}`}>
+                <Button variant="default" size="sm" className="hidden sm:flex gap-1.5 rounded-full font-semibold shadow-md hover:shadow-lg transition-all">
+                  <UserIcon size={16} weight="bold" />
+                  내 페이지
+                </Button>
+              </Link>
+              <Button variant="outline" size="sm" className="hidden sm:flex rounded-full" onClick={() => toast.success("모든 변경 사항이 저장되었습니다.")}>
                 저장
               </Button>
               <DropdownMenu>
@@ -76,6 +83,13 @@ export function Header({ user, profile, onLogin, onLogout }: HeaderProps) {
                       </div>
                     </DropdownMenuLabel>
                   </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <Link href={`/${profile?.displayName || profile?.username || user.uid}`}>
+                    <DropdownMenuItem className="cursor-pointer py-2">
+                      <UserIcon className="mr-2 h-4 w-4" weight="bold" />
+                      <span>내 페이지 보기</span>
+                    </DropdownMenuItem>
+                  </Link>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleCopyLink} className="cursor-pointer py-2">
                     <Copy className="mr-2 h-4 w-4" weight="bold" />
