@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { doc, updateDoc, increment } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import { Link } from "@/data/links"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -151,6 +153,18 @@ export default function Page() {
       await updateProfile({ bio: trimmed });
     } catch (error) {}
   }
+
+  const handleLinkClick = async (linkId: string) => {
+    if (!db || !user?.uid) return;
+    try {
+      const linkRef = doc(db, "users", user.uid, "links", linkId);
+      await updateDoc(linkRef, {
+        clicks: increment(1)
+      });
+    } catch (error) {
+      console.error("Error updating click count:", error);
+    }
+  };
 
 
   return (
@@ -308,6 +322,7 @@ export default function Page() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="block"
+                              onClick={() => handleLinkClick(link.id)}
                             >
                               <Card className="relative overflow-hidden cursor-pointer border-none bg-background/50 backdrop-blur-md ring-1 ring-foreground/5 transition-all duration-500 hover:ring-primary/30 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-1">
                                 <CardContent className="flex items-center gap-5 py-5 pr-14 pl-5">
@@ -330,6 +345,12 @@ export default function Page() {
                                     </span>
                                     <span className="text-xs text-muted-foreground/60 truncate font-medium mt-0.5">
                                       {hostname}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-col items-end gap-1 mr-8">
+                                    <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded-full group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                      {link.clicks || 0} clicks
                                     </span>
                                   </div>
 

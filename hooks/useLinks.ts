@@ -7,6 +7,7 @@ import { Link } from "@/data/links";
 export interface ExtendedLink extends Link {
   createdAt: Date;
   updatedAt?: Date;
+  clicks: number;
 }
 
 export function useLinks(user: User | null) {
@@ -30,6 +31,7 @@ export function useLinks(user: User | null) {
           url: data.url || "",
           icon: data.icon || "",
           createdAt,
+          clicks: data.clicks || 0,
         } as ExtendedLink;
       });
     },
@@ -45,6 +47,7 @@ export function useLinks(user: User | null) {
         icon: newLink.icon || "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        clicks: 0,
       });
     },
     onSuccess: () => {

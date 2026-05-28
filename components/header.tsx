@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Copy, SignOut, CheckCircle, User as UserIcon } from "@phosphor-icons/react"
+import { Copy, SignOut, CheckCircle, User as UserIcon, ChartBar } from "@phosphor-icons/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -68,6 +68,12 @@ export function Header({ user, profile, onLogin, onLogout, isAuthLoading }: Head
                   내 페이지
                 </Button>
               </Link>
+              <Link href="/stats">
+                <Button variant="secondary" size="sm" className="hidden sm:flex gap-1.5 rounded-full font-semibold shadow-sm hover:shadow-md transition-all">
+                  <ChartBar size={16} weight="bold" />
+                  통계
+                </Button>
+              </Link>
               {pathname === "/" && (
                 <Button variant="outline" size="sm" className="hidden sm:flex rounded-full" onClick={() => toast.success("모든 변경 사항이 저장되었습니다.")}>
                   저장
@@ -98,7 +104,13 @@ export function Header({ user, profile, onLogin, onLogout, isAuthLoading }: Head
                       <span>대시보드 (편집 모드)</span>
                     </DropdownMenuItem>
                   </Link>
-                  <Link href={`/${profile?.displayName || profile?.username || user.uid}`}>
+                  <Link href="/stats" className="sm:hidden">
+                    <DropdownMenuItem className="cursor-pointer py-2">
+                      <ChartBar className="mr-2 h-4 w-4" weight="bold" />
+                      <span>클릭 통계 보기</span>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href={`/${profile?.displayName || profile?.username || user.uid}`} className="sm:hidden">
                     <DropdownMenuItem className="cursor-pointer py-2">
                       <UserIcon className="mr-2 h-4 w-4" weight="bold" />
                       <span>내 퍼블릭 페이지 보기</span>

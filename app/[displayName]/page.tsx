@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { notFound, useParams } from "next/navigation";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, doc, updateDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Header } from "@/components/header";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,6 +23,7 @@ export default function UserPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [links, setLinks] = useState<ExtendedLink[]>([]);
   const [isNotFound, setIsNotFound] = useState(false);
+  const [userUid, setUserUid] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserAndLinks = async () => {
@@ -41,6 +42,7 @@ export default function UserPage() {
         const userDoc = querySnapshot.docs[0];
         const userData = userDoc.data() as UserProfile;
         setProfile(userData);
+        setUserUid(userDoc.id);
 
         const linksRef = collection(db, "users", userDoc.id, "links");
         const linksQuery = query(linksRef, orderBy("createdAt", "desc"));
@@ -54,6 +56,7 @@ export default function UserPage() {
             url: data.url || "",
             icon: data.icon || "",
             createdAt: data.createdAt?.toDate?.() ?? new Date(),
+            clicks: data.clicks || 0,
           } as ExtendedLink;
         });
 
@@ -72,6 +75,18 @@ export default function UserPage() {
   if (isNotFound) {
     notFound();
   }
+
+  const handleLinkClick = async (linkId: string) => {
+    if (!db || !userUid) return;
+    try {
+      const linkRef = doc(db, "users", userUid, "links", linkId);
+      await updateDoc(linkRef, {
+        clicks: increment(1)
+      });
+    } catch (error) {
+      console.error("Error updating click count:", error);
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
@@ -121,6 +136,7 @@ export default function UserPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block group"
+                      onClick={() => handleLinkClick(link.id)}
                       style={{ animationDelay: `${index * 100}ms` }}
                     >
                       <Card className="relative overflow-hidden cursor-pointer border-none bg-background/50 backdrop-blur-md ring-1 ring-foreground/5 transition-all duration-500 hover:ring-primary/30 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-1">
@@ -144,6 +160,12 @@ export default function UserPage() {
                             </span>
                             <span className="text-xs text-muted-foreground/60 truncate font-medium mt-0.5">
                               {hostname}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-1 mr-8">
+                            <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-1 rounded-full group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                              {link.clicks || 0} clicks
                             </span>
                           </div>
 
