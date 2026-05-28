@@ -16,7 +16,7 @@ export default function UserPage() {
   const params = useParams();
   const displayName = params.displayName as string;
   
-  const { user, login, logout } = useAuth();
+  const { user, isLoading: isAuthLoading, login, logout } = useAuth();
   const { profile: loggedInProfile } = useProfile(user);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -75,7 +75,7 @@ export default function UserPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
-      <Header user={user} profile={loggedInProfile ?? null} onLogin={login} onLogout={logout} />
+      <Header user={user} profile={loggedInProfile ?? null} onLogin={login} onLogout={logout} isAuthLoading={isAuthLoading} />
 
       <main className="flex-1 flex flex-col items-center px-6 py-12">
         {isLoading ? (

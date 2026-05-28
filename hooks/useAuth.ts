@@ -24,7 +24,11 @@ export function useAuth() {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        // 사용자가 팝업을 닫아서 로그인을 취소한 경우
+        return;
+      }
       console.error('Google 로그인 오류:', error);
       toast.error('Google 로그인에 실패했습니다.');
     }

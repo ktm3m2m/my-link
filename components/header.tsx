@@ -14,15 +14,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Copy, SignOut, CheckCircle, User as UserIcon } from "@phosphor-icons/react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 
 interface HeaderProps {
   user: User | null;
   profile: { username: string; photoURL: string; displayName?: string } | null;
   onLogin: () => void;
   onLogout: () => void;
+  isAuthLoading?: boolean;
 }
 
-export function Header({ user, profile, onLogin, onLogout }: HeaderProps) {
+export function Header({ user, profile, onLogin, onLogout, isAuthLoading }: HeaderProps) {
+  const pathname = usePathname();
+
   const handleCopyLink = () => {
     if (!profile?.username && !user?.uid) return;
     const url = `${window.location.origin}/${profile?.displayName || profile?.username || user?.uid}`;
@@ -46,15 +50,17 @@ export function Header({ user, profile, onLogin, onLogout }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-foreground/5 bg-background/80 backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <div className="flex items-center justify-center rounded-lg bg-primary w-8 h-8 text-primary-foreground font-bold">
             M
           </div>
           <span className="text-xl font-bold tracking-tight">MyLink</span>
-        </div>
+        </Link>
         
         <div className="flex items-center gap-4">
-          {user ? (
+          {isAuthLoading ? (
+            <div className="h-10 w-10 rounded-full bg-muted/50 animate-pulse" />
+          ) : user ? (
             <div className="flex items-center gap-3">
               <Link href={`/${profile?.displayName || profile?.username || user.uid}`}>
                 <Button variant="default" size="sm" className="hidden sm:flex gap-1.5 rounded-full font-semibold shadow-md hover:shadow-lg transition-all">
@@ -62,9 +68,11 @@ export function Header({ user, profile, onLogin, onLogout }: HeaderProps) {
                   내 페이지
                 </Button>
               </Link>
-              <Button variant="outline" size="sm" className="hidden sm:flex rounded-full" onClick={() => toast.success("모든 변경 사항이 저장되었습니다.")}>
-                저장
-              </Button>
+              {pathname === "/" && (
+                <Button variant="outline" size="sm" className="hidden sm:flex rounded-full" onClick={() => toast.success("모든 변경 사항이 저장되었습니다.")}>
+                  저장
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger className="relative h-10 w-10 rounded-full hover:bg-transparent ring-0 outline-none">
                   <Avatar className="h-10 w-10 ring-2 ring-primary/10 transition-all hover:ring-primary/30 cursor-pointer">
@@ -84,10 +92,16 @@ export function Header({ user, profile, onLogin, onLogout }: HeaderProps) {
                     </DropdownMenuLabel>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
+                  <Link href="/">
+                    <DropdownMenuItem className="cursor-pointer py-2">
+                      <UserIcon className="mr-2 h-4 w-4" weight="bold" />
+                      <span>대시보드 (편집 모드)</span>
+                    </DropdownMenuItem>
+                  </Link>
                   <Link href={`/${profile?.displayName || profile?.username || user.uid}`}>
                     <DropdownMenuItem className="cursor-pointer py-2">
                       <UserIcon className="mr-2 h-4 w-4" weight="bold" />
-                      <span>내 페이지 보기</span>
+                      <span>내 퍼블릭 페이지 보기</span>
                     </DropdownMenuItem>
                   </Link>
                   <DropdownMenuSeparator />

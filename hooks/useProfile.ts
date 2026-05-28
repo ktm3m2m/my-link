@@ -72,21 +72,6 @@ export function useProfile(user: User | null) {
     mutationFn: async (updates: Partial<UserProfile>) => {
       if (!user || !db) throw new Error("로그인이 필요합니다.");
       
-      if (updates.displayName) {
-        const slugRegex = /^[a-z0-9_-]+$/;
-        if (!slugRegex.test(updates.displayName)) {
-          throw new Error("URL 식별자는 영문 소문자, 숫자, 하이픈(-), 언더스코어(_)만 사용 가능합니다.");
-        }
-
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("displayName", "==", updates.displayName));
-        const querySnapshot = await getDocs(q);
-
-        const isDuplicate = querySnapshot.docs.some(d => d.id !== user.uid);
-        if (isDuplicate) {
-          throw new Error("이미 사용 중인 URL 식별자입니다. 다른 이름을 사용해주세요.");
-        }
-      }
 
       await setDoc(doc(db, "users", user.uid), updates, { merge: true });
     },

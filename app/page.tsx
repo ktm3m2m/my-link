@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { AddLinkDialog } from "@/components/add-link-dialog"
-import { ShareNetwork, ArrowUpRight, Trash, CircleNotch, PencilSimple } from "@phosphor-icons/react"
+import { ShareNetwork, ArrowUpRight, Trash, CircleNotch, PencilSimple, CheckCircle } from "@phosphor-icons/react"
 import { useAuth } from "@/hooks/useAuth"
 import { Header } from "@/components/header"
 import { toast } from "sonner"
@@ -15,7 +15,7 @@ import { useProfile } from "@/hooks/useProfile"
 import { useLinks, ExtendedLink } from "@/hooks/useLinks"
 
 export default function Page() {
-  const { user, login, logout } = useAuth();
+  const { user, isLoading: isAuthLoading, login, logout } = useAuth();
   const { profile, isLoading: isProfileLoading, updateProfile } = useProfile(user);
   const { links, isLoading: isLinksLoading, addLink, updateLink, deleteLink } = useLinks(user);
 
@@ -32,10 +32,8 @@ export default function Page() {
   // 인라인 편집 관련 상태
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingBio, setIsEditingBio] = useState(false)
-  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false)
   const [tempName, setTempName] = useState("")
   const [tempBio, setTempBio] = useState("")
-  const [tempDisplayName, setTempDisplayName] = useState("")
 
   const handleAddLink = async (newLink: Omit<Link, "id">) => {
     setIsSubmitting(true);
@@ -47,6 +45,26 @@ export default function Page() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCopyLink = () => {
+    if (!profile?.username && !user?.uid) return;
+    const url = `${window.location.origin}/${profile?.displayName || profile?.username || user?.uid}`;
+    navigator.clipboard.writeText(url)
+      .then(() => {
+        toast.custom((t) => (
+          <div className="flex w-[340px] sm:w-[400px] items-center gap-4 rounded-[1.25rem] border border-foreground/10 bg-background/60 p-4 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] backdrop-blur-2xl ring-1 ring-white/10">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+              <CheckCircle size={24} weight="fill" className="text-primary animate-in zoom-in duration-500" />
+            </div>
+            <div className="flex flex-col gap-1 overflow-hidden">
+              <span className="text-[15px] font-extrabold tracking-tight text-foreground">링크 복사 완료 ✨</span>
+              <span className="text-xs font-semibold text-muted-foreground truncate">{url}</span>
+            </div>
+          </div>
+        ), { position: "top-center", duration: 3500 });
+      })
+      .catch(() => toast.error("링크 복사에 실패했습니다.", { position: "top-center" }));
   };
 
   const handleConfirmDelete = async () => {
@@ -134,25 +152,18 @@ export default function Page() {
     } catch (error) {}
   }
 
-  const handleUpdateDisplayName = async () => {
-    setIsEditingDisplayName(false);
-    const trimmed = tempDisplayName.trim().toLowerCase();
-    if (!trimmed) {
-      toast.error("URL 식별자는 빈 칸으로 둘 수 없습니다.");
-      return;
-    }
-    if (trimmed === profile?.displayName) return;
-    try {
-      await updateProfile({ displayName: trimmed });
-    } catch (error) {}
-  };
 
   return (
     <div className="flex flex-col min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
-      <Header user={user} profile={profile ?? null} onLogin={login} onLogout={logout} />
+      <Header user={user} profile={profile ?? null} onLogin={login} onLogout={logout} isAuthLoading={isAuthLoading} />
 
       <main className="flex-1 flex flex-col items-center px-6 py-12">
-        {!user ? (
+        {isAuthLoading ? (
+          <div className="flex flex-col items-center justify-center mt-20 gap-3 animate-in fade-in duration-500">
+            <CircleNotch size={32} className="animate-spin text-primary opacity-60" />
+            <p className="text-sm text-muted-foreground/60 font-semibold">로그인 상태를 확인하는 중...</p>
+          </div>
+        ) : !user ? (
           <section className="flex flex-col items-center text-center mt-20 animate-in fade-in slide-in-from-bottom-8 duration-1000">
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6 leading-tight">
               나만의 모든 링크를 <br className="hidden sm:block"/>
@@ -168,7 +179,12 @@ export default function Page() {
         ) : (
           <>
             <div className="absolute top-24 right-8 z-10">
-              <Button variant="outline" size="icon" className="rounded-2xl h-12 w-12 ring-1 ring-foreground/5 bg-background/50 backdrop-blur-xl transition-all hover:bg-accent hover:scale-110 active:scale-95 shadow-sm">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="rounded-2xl h-12 w-12 ring-1 ring-foreground/5 bg-background/50 backdrop-blur-xl transition-all hover:bg-accent hover:scale-110 active:scale-95 shadow-sm"
+                onClick={handleCopyLink}
+              >
                 <ShareNetwork size={20} weight="bold" />
               </Button>
             </div>
@@ -202,31 +218,9 @@ export default function Page() {
                 </h2>
               )}
 
-              {isEditingDisplayName ? (
-                <div className="flex items-center justify-center mb-4">
-                  <span className="text-sm font-medium text-muted-foreground mr-0.5">@</span>
-                  <input
-                    type="text"
-                    value={tempDisplayName}
-                    onChange={(e) => setTempDisplayName(e.target.value)}
-                    onBlur={handleUpdateDisplayName}
-                    onKeyDown={(e) => e.key === 'Enter' && handleUpdateDisplayName()}
-                    className="text-sm font-medium text-muted-foreground bg-transparent border-b-2 border-primary focus:outline-none w-auto min-w-[100px] max-w-[200px]"
-                    autoFocus
-                  />
-                </div>
-              ) : (
-                <p
-                  className="text-sm font-medium text-muted-foreground mb-4 cursor-pointer hover:text-primary transition-colors select-none"
-                  onClick={() => {
-                    setTempDisplayName(profile?.displayName || "");
-                    setIsEditingDisplayName(true);
-                  }}
-                  title="클릭하여 URL 식별자 수정"
-                >
-                  @{profile?.displayName}
-                </p>
-              )}
+              <p className="text-sm font-medium text-muted-foreground mb-4 select-none">
+                @{profile?.displayName}
+              </p>
 
               {isEditingBio ? (
                 <input
